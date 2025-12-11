@@ -1,73 +1,116 @@
 # AdventureWorks Analytics in Microsoft Fabric
 
-This project is an end-to-end analytics solution built in **Microsoft Fabric** using the AdventureWorks dataset.
+This project demonstrates an end-to-end analytics workflow using the **Microsoft Fabric** ecosystem.  
+It covers ingestion, transformation, modeling, semantic layer development, DAX metrics, and Python-based exploratory data analysis — following modern best practices such as the **Medallion Architecture**.
 
-It demonstrates:
-
-- Ingesting CSV files into a **Lakehouse**
-- Building a **Warehouse** with a Silver layer using SQL views
-- Designing a **star schema** semantic model with proper relationships (incl. inactive date relationship for returns)
-- Writing **DAX measures** for Sales, YoY, Margin and Return Rate
-- Doing simple **data science in Python (pandas)**, including data cleaning, yearly sales analysis and a correlation heatmap
+The goal is to show how raw CSV files evolve into a rich analytical model powering business insights.
 
 ---
 
-## Architecture Overview
+## 📐 Medallion Architecture (Bronze → Silver → Gold)
 
-1. **Data source**  
-   - AdventureWorks CSV files (sales 2020–2022, returns, customers, products, territories)
+### 🥉 Bronze – Raw Layer  
+The Bronze layer contains the **original CSV files** uploaded directly into the Lakehouse under `Files/`.  
+No transformation is performed at this stage.
 
-2. **Lakehouse & Warehouse**  
-   - CSV files stored in Lakehouse  
-   - SQL views in a `silver` schema to clean and type-cast the data  
-   - Example views: `vDimCustomer`, `vDimProduct`, `vDimRegion`, `vFactSales`, `vFactReturns`, `DimDate`
+<img width="1823" height="713" alt="Lakehouse_files" src="https://github.com/user-attachments/assets/5c07454a-bbfa-4480-88a2-8dcbadbd33a5" />
 
-3. **Semantic model (Direct Lake)**  
-   - Star schema with:
-     - DimCustomer, DimProduct, DimRegion, DimDate
-     - FactSales, FactReturns
-   - Active date relationship: `DimDate[Date] -> FactSales[OrderDate]`
-   - Inactive date relationship: `DimDate[Date] -> FactReturns[ReturnDate]` (used via `USERELATIONSHIP` in DAX)
 
-4. **Python notebook**  
-   - Reads tables from the Lakehouse (`sales2020`, `sales2021`, `sales2022`, `product`, `customers`)  
-   - Combines and cleans data into a single `sales_full` DataFrame  
-   - Calculates `SalesAmount` and yearly totals  
-   - Builds a **correlation heatmap** for numerical variables
 
 ---
 
-## Files in this repository
+### 🥈 Silver – Cleaned & Modeled Layer  
+The Silver layer is implemented using **SQL views** inside the Warehouse.  
+These views perform:
 
-- `sql/` – SQL scripts for the Warehouse Silver views and DimDate
-- `dax/measures_sales_and_returns.md` – DAX measures used in the semantic model
-- `notebooks/adventureworks_fabric_notebook.ipynb` – Python notebook with data cleaning and EDA
-- `images/model-view.png` – Screenshot of the star schema in the semantic model
-- `images/report-summary.png` – Sample Power BI / Fabric report summary page
-- `images/correlation_heatmap.png` – Correlation heatmap created in the notebook
+- type casting  
+- standardization of business keys  
+- joining lookup tables  
+- date normalization  
+- early cleaning steps  
 
----
+Example views:
 
-## Key Insights (example)
+- `silver.vDimCustomer`  
+- `silver.vDimProduct`  
+- `silver.vDimRegion`  
+- `silver.vFactSales`  
+- `silver.vFactReturns`  
+- `silver.DimDate`
 
-- **Sales trend:** Sales grew from 2020 to 2021 and slightly declined in 2022.
-- **Sales drivers:** `SalesAmount` is mainly driven by `OrderQuantity` and `ProductPrice`, as confirmed by the correlation analysis.
-- **Returns:** Returns are modelled in a separate fact table and linked to the same dimensions, with an inactive date relationship activated in DAX when needed.
+<img width="1839" height="838" alt="warehouse_views" src="https://github.com/user-attachments/assets/e33b1ddf-6a29-4b3f-a73c-c96b2a50ea14" />
 
----
-
-## How to reproduce (high level)
-
-1. Create a Fabric Lakehouse and upload the AdventureWorks CSV files.
-2. Create Warehouse views using the SQL scripts in `/sql`.
-3. Build a semantic model on top of the Warehouse tables and add the DAX measures.
-4. Open the Python notebook in a Fabric Notebook, attach it to the Lakehouse, and run all cells.
 
 ---
 
-## Technologies
+### 🥇 Gold – Analytics & Semantic Layer  
+The Gold layer powers the **semantic model (Direct Lake)** used by Power BI / Fabric reporting.  
+A classic **star schema** is created with:
 
-- Microsoft Fabric (Lakehouse, Warehouse, Semantic model / Direct Lake)
-- SQL (T-SQL style views)
-- DAX (time intelligence, inactive relationships, KPI measures)
-- Python (pandas, matplotlib)
+- Fact tables: Sales, Returns  
+- Dimensions: Date, Product, Customer, Region  
+
+This layer includes business metrics implemented in DAX, such as:
+
+- **Sales Amount**  
+- **Sales Amount Last Year**  
+- **Sales YoY %**  
+- **Return Quantity (with USERELATIONSHIP)**  
+- **Return Rate**  
+- **KPI color logic**
+
+<img width="1045" height="656" alt="model-view" src="https://github.com/user-attachments/assets/3b91f238-bc9a-40e7-b973-692907b71b4e" />
+
+---
+
+## 📊 Python Exploratory Data Analysis (EDA)
+
+A Fabric Notebook is used to perform light data science on top of the unified cleaned dataset.
+
+Key steps include:
+
+### ✔ Loading and merging data from Lakehouse  
+Data is loaded via Spark and converted to pandas for transformation.
+
+### ✔ Data cleaning  
+- Normalizing data types  
+- Handling missing values  
+- Removing invalid records  
+
+### ✔ Creating business metrics  
+`SalesAmount = OrderQuantity * ProductPrice`
+
+### ✔ Yearly sales summary  
+A simple grouped aggregation yields total revenue per year.
+
+<img width="1045" height="656" alt="model-view" src="https://github.com/user-attachments/assets/a5304d86-3f81-4d8f-9e33-976a9c48276b" />
+
+
+### ✔ Product performance  
+Identification of the Top 5 products by SalesAmount.
+
+### ✔ Correlation heatmap  
+A numerical correlation matrix is visualized to understand relationships between key variables.
+
+<img width="1048" height="704" alt="image" src="https://github.com/user-attachments/assets/142e0932-8d2d-4424-8562-98f553cffe65" />
+
+---
+
+## Key Findings
+
+- `Sales increased significantly from 2020 → 2021, with a minor dip in 2022`
+- `SalesAmount is driven mainly by OrderQuantity and ProductPrice`
+- `Returns represent a small portion of total orders`
+- `Semantic modeling enables flexible KPI calculations`
+- `Correlation analysis confirms expected business patterns`
+
+## Technologies Used
+
+- Microsoft Fabric Lakehouse
+- Microsoft Fabric Warehouse
+- SQL (views, type casting, joins)
+- DAX (time intelligence, inactive relationships, KPIs)
+- Python (pandas, numpy, matplotlib)
+- Direct Lake semantic model
+- Power BI visualizations
+
